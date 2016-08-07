@@ -1,6 +1,11 @@
-
 logs
 
 database
 
-environments
+migrations
+
+build
+
+build/contracts
+
+node_modules

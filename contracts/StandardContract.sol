@@ -1,3 +1,23 @@
+import "Owned.sol";
+import "Mortal.sol";
+import "NameRegistryDB.sol";
+
+contract StandardContract is Owned,Mortal{
+    NameRegistryDB registry;
+    bool active;
+
+    modifier isActive(){if (active==true || msg.sender==owner)  _}
+
+    function setActive(bool _active) onlyOwner{
+      active = _active;
+    }
+
+    function activateContract(NameRegistryDB _registry){
+        registry = _registry;
+    }
+
+
+}
 contract Logger{
 
     enum LogLevel{
