@@ -1,7 +1,8 @@
+pragma solidity ^0.4.1;
 contract Owned  {
   address owner;
   modifier onlyOwner() {
-    if (msg.sender==owner) _
+    if (msg.sender==owner) throw ; _;
   }
   function owned() {
     owner = msg.sender;
@@ -24,7 +25,7 @@ contract Mortal is Owned {
 contract Active is Owned{
   bool active;
 
-  modifier isActive(){if (active==true || msg.sender==owner)  _}
+  modifier isActive(){if (active==true || msg.sender==owner)  throw ; _;}
 
   function setActive(bool _active) onlyOwner {
     active = _active;
@@ -35,9 +36,9 @@ contract Active is Owned{
 contract Permissionable  {
     PermissionsDB permissionsDB;
 
-    modifier hasAdminRights(address _contract,address _user){if(permissionsDB.hasAdminRights(_user)==true) _}
-    modifier hasWriteRights(address _contract,address _user){if(permissionsDB.hasWriteRights(_contract,_user)==true) _}
-    modifier hasReadRights (address _contract,address _user){if(permissionsDB.hasReadRights (_contract,_user)==true) _}
+    modifier hasAdminRights(address _contract,address _user){if(permissionsDB.hasAdminRights(_user)==true) throw ; _;}
+    modifier hasWriteRights(address _contract,address _user){if(permissionsDB.hasWriteRights(_contract,_user)==true) throw ; _;}
+    modifier hasReadRights (address _contract,address _user){if(permissionsDB.hasReadRights (_contract,_user)==true) throw ; _;}
 
     function setPermissionsDB(PermissionsDB _permissionsDB){
       permissionsDB  = _permissionsDB;
@@ -50,7 +51,16 @@ contract StandardContract is Owned,Mortal,Active,Permissionable{
     string SECURITY_NAME = "s43agdius";
     string LOGGER_NAME = "g73kdjh856";
 
+    address controller;
     Logger logger;
+
+    modifier onlyController(){
+      if(msg.sender==controller) throw ; _;
+    }
+
+    modifier onlyControllerOrOwner(){
+      if(msg.sender==controller ||msg.sender==owner ) throw ; _;
+    }
 
 
     function StandardContract(){
@@ -58,33 +68,89 @@ contract StandardContract is Owned,Mortal,Active,Permissionable{
     }
 
 
-    function activateContract(NameRegistry _registry) onlyOwner{
-        registry = _registry;
-        PermissionsDB permissionsDB = PermissionsDB (registry.getMapping(SECURITY_NAME));
-        setPermissionsDB(permissionsDB);
-        logger = Logger (registry.getMapping(LOGGER_NAME));
-        setActive(true);
+    function activate(NameRegistry _registry,address _address) onlyOwner;
+
+    function setAsController(address _dbAddress){
+      registry.addDatabase(this,_dbAddress);
+      controller = this;
     }
 
+    function setAsDatabase(address _controllerAddress){
+      registry.addDatabase(_controllerAddress,this);
+      controller = _controllerAddress;
+    }
+
+    // as a default don't want ether
+    function() {
+          throw;
+    }
+
+}
+
+
+contract StandardController is StandardContract{
+
+  function activateController(NameRegistry _registry,address _databaseAddress) onlyOwner {
+    registry = _registry;
+    PermissionsDB permissionsDB = PermissionsDB (registry.getMapping(SECURITY_NAME));
+    setPermissionsDB(permissionsDB);
+    logger = Logger (registry.getMapping(LOGGER_NAME));
+    setActive(true);
+    setAsController(_databaseAddress);
+  }
 
 
 }
 
+contract StandardDatabase is StandardContract{
+
+  function activateDatabase(NameRegistry _registry,address _controllerAddress) onlyOwner {
+    registry = _registry;
+    PermissionsDB permissionsDB = PermissionsDB (registry.getMapping(SECURITY_NAME));
+    setPermissionsDB(permissionsDB);
+    logger = Logger (registry.getMapping(LOGGER_NAME));
+    setActive(true);
+    setAsDatabase(_controllerAddress);
+  }
+
+
+}
+
+
+
 contract NameRegistry is Owned,Mortal{
 
   mapping (string=>address) registry;
+  mapping (address=>address) databases;
+  mapping (address=>address) controllers;
 
   function NameRegistry(){
      owned();
   }
 
-  function addMapping(string _name,address _address) onlyOwner {
+  function addMapping(string _name,address _address) external onlyOwner {
         registry[_name]=_address;
   }
 
-  function getMapping(string _name) constant returns (address){
+  function getMapping(string _name) external constant returns (address){
         return registry[_name];
   }
+
+  function addDatabase(address _controller,address _database) external onlyOwner {
+        databases[_controller] =_database;
+        controllers[_database] = _controller;
+  }
+
+  function getController(address _database) external constant returns (address){
+        return controllers[_database];
+  }
+
+  function getDatabase(address _controller) external constant returns (address){
+        return databases[_controller];
+  }
+
+
+
 }
 
 
@@ -99,7 +165,7 @@ contract Logger{
     event LogNormalEvent(address indexed sender, bytes32 msg);
     event LogDebugEvent(address indexed sender, bytes32 msg);
 
-    modifier isDebug(){if(logLevel==LogLevel.DEBUG) _ }
+    modifier isDebug(){if(logLevel==LogLevel.DEBUG) throw ; _; }
 
     function setLevel(LogLevel _logLevel) external {
         logLevel = _logLevel;
@@ -125,7 +191,7 @@ contract Logger{
 contract PermissionsDB is Owned,Mortal {
 
     modifier onlyControllerOrOwner() {
-      if (msg.sender== controller || msg.sender==owner ) _
+      if (msg.sender== controller || msg.sender==owner ) throw ; _;
     }
 
     mapping(address =>mapping(address=>uint8)) contractPermissions;
